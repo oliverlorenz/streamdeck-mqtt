@@ -1,0 +1,33 @@
+{
+  "name": "streamdeck-mqtt",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node .build/src/index.js",
+    "watch": "npx tsc -w",
+    "set-image": "node .build/src/commands/setImage.js",
+    "import-profile": "node .build/src/commands/importProfile.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/bunyan": "^1.8.6",
+    "bunyan": "^1.8.12",
+    "dotenv": "^8.2.0",
+    "elgato-stream-deck": "^3.2.0",
+    "mqtt": "^3.0.0",
+    "mqtt-match": "^2.0.3",
+    "sharp": "^0.24.0",
+    "usb": "^1.6.2",
+    "yaml": "^1.7.2"
+  },
+  "devDependencies": {
+    "@types/events": "^3.0.0",
+    "@types/sharp": "^0.24.0",
+    "@types/usb": "^1.5.1",
+    "@types/yaml": "^1.2.0",
+    "tslint": "^6.0.0",
+    "typescript": "^3.7.5"
+  }
+}
