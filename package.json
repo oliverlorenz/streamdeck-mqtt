@@ -6,28 +6,37 @@
   "scripts": {
     "start": "node .build/src/index.js",
     "watch": "npx tsc -w",
-    "set-image": "node .build/src/commands/setImage.js",
-    "import-profile": "node .build/src/commands/importProfile.js"
+    "build": "npx pkg -t node$(node --version | grep -Eo \"[0-9]+\" | head -n 1)-linux .build/src/cli.js -o test"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/bunyan": "^1.8.6",
     "bunyan": "^1.8.12",
+    "commander": "^5.1.0",
     "dotenv": "^8.2.0",
     "elgato-stream-deck": "^3.2.0",
+    "elgato-stream-deck-utils": "^1.0.1",
     "mqtt": "^3.0.0",
     "mqtt-match": "^2.0.3",
+    "mqtt-wildcard": "^3.0.9",
+    "package": "^1.0.1",
     "sharp": "^0.24.0",
     "usb": "^1.6.2",
     "yaml": "^1.7.2"
   },
   "devDependencies": {
+    "@types/request-promise-native": "^1.0.17",
+    "@types/bunyan": "^1.8.6",
+    "@types/commander": "^2.12.2",
     "@types/events": "^3.0.0",
     "@types/sharp": "^0.24.0",
     "@types/usb": "^1.5.1",
     "@types/yaml": "^1.2.0",
+    "source-map-support": "^0.5.19",
     "tslint": "^6.0.0",
     "typescript": "^3.7.5"
+  },
+  "bin": {
+    "streamdeck-mqtt": ". .build/src/cli.js"
   }
 }

@@ -2,47 +2,47 @@ import mqtt, { MqttClient } from 'mqtt';
 import { EventEmitter } from 'events';
 import Logger from 'bunyan';
 import match from 'mqtt-match';
+// @ts-ignore
+import mqttWildcard from 'mqtt-wildcard';
 
-const EVENT_PROFILE_CHANGED = 'profileChanged';
 const EVENT_BUTTON_PROPERTY_CHANGED = 'buttonPropertyChanged';
+const EVENT_BUTTON_LAYER_IMAGE_CHANGED = 'buttonLayerImageChanged';
 
 export class MqttHandler {
   private emitter: EventEmitter;
-  private logger: Logger;
   private mqttClient: MqttClient | undefined;
   private currentProfile: string | undefined;
   private serialNumber: string | undefined;
+  private baseTopic: string | undefined;
 
-  constructor(logger: Logger) {
+  constructor(
+    private logger: Logger
+  ) {
     this.emitter = new EventEmitter();
-    this.logger = logger.child({ handler: 'MqttHandler' });
-    this.serialNumber = process.env.STREAMDECK_SERIALNUMBER;
   }
 
-  async start() {
+  async start(baseTopic: string, brokerUrl: string, mqttOptions?: mqtt.IClientOptions) {
+    this.baseTopic = baseTopic;
     await new Promise((resolve) => {
       this.mqttClient  = mqtt.connect(
-        process.env.MQTT_BROKER_URL,
-        {
-          password: process.env.MQTT_BROKER_PASSWORD,
-          username: process.env.MQTT_BROKER_USERNAME,
-        }
+        brokerUrl,
+        mqttOptions
       );
       this.mqttClient.on('connect', resolve);
       this.mqttClient.on('message', this.onMessage.bind(this));
-      this.mqttClient.subscribe(`${this.serialNumber}/#`);
+      this.mqttClient.subscribe(`${this.baseTopic}/#`);
     })
-    this.logger.info('connected', { brokerUrl: process.env.MQTT_BROKER_URL });
+    this.logger.info('connected', { brokerUrl });
   }
 
-  onProfileChanged(callback: (profileName: string) => void) {
-    this.emitter.on(EVENT_PROFILE_CHANGED, (payload: Buffer) => {
-      const profileName = payload.toString();
-      this.currentProfile = profileName;
-      this.logger.info('profile changed', { profile: payload.toString() });
-      callback(profileName);
-    })
-  }
+  // onProfileChanged(callback: (profileName: string) => void) {
+  //   this.emitter.on(EVENT_PROFILE_CHANGED, (payload: Buffer) => {
+  //     const profileName = payload.toString();
+  //     this.currentProfile = profileName;
+  //     this.logger.info('profile changed', { profile: payload.toString() });
+  //     callback(profileName);
+  //   })
+  // }
 
   onButtonPropertyChanged(callback: (buttonIndex: number, layer: string, payload: Buffer) => void) {
     this.emitter.on(EVENT_BUTTON_PROPERTY_CHANGED, (buttonIndex: number, layer: string, payload: Buffer) => {
@@ -51,49 +51,100 @@ export class MqttHandler {
     });
   }
 
-  getProfileTopic(profileName: string) {
-    return `${this.serialNumber}/profile/${profileName}/#`;
+  onButtonImageLayerChanged(callback: (buttonIndex: number, layerIndex: number, payload: Buffer) => void) {
+    this.emitter.on(EVENT_BUTTON_LAYER_IMAGE_CHANGED, (buttonIndex: number, layerIndex: number, payload: Buffer) => {
+      this.logger.debug('button image layer changed', { buttonIndex, layerIndex })
+      callback(buttonIndex, layerIndex, payload);
+    });
   }
+
+  setButtonImageLayer(buttonIndex: number, imageLayerIndex: number, imageBuffer: Buffer | string, permanent: boolean = false, qos: 1 | 2 = 1) {
+    this.mqttClient?.publish(
+      this.getButtonImageLayerTopic(
+        buttonIndex.toString(), 
+        imageLayerIndex.toString()
+      ),
+      imageBuffer,
+      {
+        retain: permanent,
+        qos
+      }
+    )
+  }
+
+  // getProfileTopic(profileName: string) {
+  //   return `${this.serialNumber}/profile/${profileName}/#`;
+  // }
 
   getButtonTopic(profileName: string) {
     return `${this.serialNumber}/profile/${profileName}/#`;
   }
 
-  subscribeProfile(profileName: string) {
-    const topic = this.getProfileTopic(profileName)
-    this.mqttClient?.subscribe(topic);
-    this.logger.debug('subscribe to profile', { profileName, topic })
+  // subscribeProfile(profileName: string) {
+  //   const topic = this.getProfileTopic(profileName)
+  //   this.mqttClient?.subscribe(topic);
+  //   this.logger.debug('subscribe to profile', { profileName, topic })
+  // }
+
+  
+
+  // unsubscribeProfile(profileName: string) {
+  //   const topic = this.getProfileTopic(profileName)
+  //   this.mqttClient?.unsubscribe(topic);
+  //   this.logger.debug('unsubscribe from profile', { profileName, topic })
+  // }
+
+  // protected isCurrentProfileChanged(topic: string) {
+  //   return match(`${this.serialNumber}/profile/current`, topic);
+  // }
+
+  protected getButtonImageLayerTopic(buttonIndexOrWildcard: string, layerIndexOrWildcard: string) {
+    return `${this.baseTopic}/button/${buttonIndexOrWildcard}/layers/${layerIndexOrWildcard}/image`
   }
 
-  sendButtonUp(buttonIndex: number) {
-    const topic = `${this.serialNumber}/profile/${this.currentProfile}/button/${buttonIndex}/function`;
+  protected getButtonDownTopic(buttonIndexOrWildcard: string) {
+    return `${this.baseTopic}/button/${buttonIndexOrWildcard}/event/down`
+  }
+
+  public sendButtonDown(buttonIndex: number) {
+    this.logger.debug('send button down', { buttonIndex })
+    this.mqttClient?.publish(
+      this.getButtonDownTopic(buttonIndex.toString()),
+      Date.now().toString() 
+    )
+  }
+
+  protected getButtonUpTopic(buttonIndexOrWildcard: string) {
+    return `${this.baseTopic}/button/${buttonIndexOrWildcard}/event/up`
+  }
+
+  public sendButtonUp(buttonIndex: number) {
     this.logger.debug('send button up', { buttonIndex })
-    this.mqttClient?.publish(topic, 'up')
+    this.mqttClient?.publish(
+      this.getButtonUpTopic(buttonIndex.toString()),
+      Date.now().toString() 
+    )
   }
 
-  unsubscribeProfile(profileName: string) {
-    const topic = this.getProfileTopic(profileName)
-    this.mqttClient?.unsubscribe(topic);
-    this.logger.debug('unsubscribe from profile', { profileName, topic })
-  }
-
-  protected isCurrentProfileChanged(topic: string) {
-    return match(`${this.serialNumber}/profile/current`, topic);
-  }
-
-  protected isButtonLayerChanged(topic: string) {
-    return match(`${this.serialNumber}/profile/${this.currentProfile}/button/+/layers/+`, topic);
+  protected isButtonLayerImageChangedMessage(topic: string) {
+    return match(
+      this.getButtonImageLayerTopic('+', '+'), 
+      topic
+    );
   }
 
   protected onMessage(topic: string, payload: Buffer) {
-    this.logger.debug('got message', { topic });
-    if (this.isCurrentProfileChanged(topic)) {
-      this.emitter.emit(EVENT_PROFILE_CHANGED, payload);
-    } else if (this.isButtonLayerChanged(topic)) {
-      const topicParts = topic.split('/');
-      const buttonIndex = topicParts[4];
-      const layer = topicParts[5];
-      this.emitter.emit(EVENT_BUTTON_PROPERTY_CHANGED, buttonIndex, layer, payload);
+   if (this.isButtonLayerImageChangedMessage(topic)) {
+     console.log(topic)
+      const wildcard = mqttWildcard(
+        topic,
+        this.getButtonImageLayerTopic('+', '+'),
+      );
+      if (wildcard) {
+        const buttonIndex = wildcard[0];
+        const layerIndex = wildcard[1];
+        this.emitter.emit(EVENT_BUTTON_LAYER_IMAGE_CHANGED, buttonIndex, layerIndex, payload);
+      }
     }
   }
 }

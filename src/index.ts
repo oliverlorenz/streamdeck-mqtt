@@ -1,36 +1,61 @@
 import 'source-map-support/register';
-import { UsbHandler } from './UsbHandler';
-import { StreamDeckHandler } from './StreamDeckHandler';
-import bunyan from 'bunyan';
-import { StreamDeck } from 'elgato-stream-deck';
+import bunyan, { LogLevelString } from 'bunyan';
 import { MqttHandler } from './MqttHandler';
-import { ProfileHandler } from './ProfileHandler';
 import { config } from 'dotenv';
-
+import { Profile } from 'elgato-stream-deck-utils';
+import Logger from 'bunyan';
+import * as StreamDeck from 'elgato-stream-deck';
+import { IClientOptions } from 'mqtt';
 config();
+const packageJson = require('package')(module);
 
-const logger = bunyan.createLogger({
-  name: 'streamdeck',
-  level: 'debug',
-});
+export class StreamDeckMqttHandler {
+  private profile: Profile;
 
-const usbHandler = new UsbHandler(logger);
-const streamDeckHandler = new StreamDeckHandler(usbHandler);
+  constructor(
+    private streamDeck: StreamDeck.StreamDeck,
+    private brokerUrl: string,
+    private baseTopic: string = '',
+    private mqttOptions?: IClientOptions,
+    private logger?: bunyan
+  ) {
+    this.profile = new Profile(this.streamDeck);
+    if (!this.logger) {
+      this.logger = bunyan.createLogger({
+        name: packageJson.name,
+        level: process.env.DEBUG_LEVEL as LogLevelString || 'info',
+      });
+    }
+  }
 
-streamDeckHandler.onReady(async (streamDeck: StreamDeck) => {
-  streamDeck.on('up', (buttonIndex) => {
-    profileHandler.buttonUp(buttonIndex);
-  });
+  protected async imageChangedHandler(buttonIndex: number, imageLayerIndex: number, payload: Buffer) {
+    const button = this.profile.getButtonByIndex(buttonIndex);
+    if (payload.length) {
+      await button.setImage(imageLayerIndex, payload);
+    } else {
+      await button.clearImage(imageLayerIndex);
+    }
+    await button.render();
+  }
 
-  const mqttHandler = new MqttHandler(logger);
-  await mqttHandler.start();
+  async start() {
+    this.streamDeck.clearAllKeys();
 
-  const profileHandler = new ProfileHandler(logger, mqttHandler);
-  await profileHandler.start();
+    const mqttHandler = new MqttHandler(this.logger as Logger);
+    await mqttHandler.start(
+      this.baseTopic,
+      this.brokerUrl
+    );
 
-  profileHandler.onButtonPropertyChanged((buttonIndex, layer, payload) => {
-    streamDeck.fillImage(buttonIndex, payload);
-  });
-});
+    
+    mqttHandler.onButtonImageLayerChanged(this.imageChangedHandler);
 
-streamDeckHandler.start();
+    this.profile.onButtonDown((buttonIndex) => {
+      mqttHandler.sendButtonDown(buttonIndex);
+    });
+
+    this.profile.onButtonUp((buttonIndex) => {
+      mqttHandler.sendButtonUp(buttonIndex);
+    });
+  }
+}
