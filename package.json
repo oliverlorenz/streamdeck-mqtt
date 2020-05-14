@@ -16,6 +16,7 @@
     "dotenv": "^8.2.0",
     "elgato-stream-deck": "^3.3.0",
     "elgato-stream-deck-utils": "^1.0.1",
+    "minimist": ">=1.2.3",
     "mqtt": "^3.0.0",
     "mqtt-match": "^2.0.3",
     "mqtt-wildcard": "^3.0.9",
