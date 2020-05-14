@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node .build/src/index.js",
     "watch": "npx tsc -w",
-    "build": "npx pkg -t node$(node --version | grep -Eo \"[0-9]+\" | head -n 1)-linux .build/src/cli.js -o test"
+    "build": "npx pkg -t node$(node --version | grep -Eo \"[0-9]+\" | head -n 1)-linux .build/src/cli.js -o test",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
   },
   "author": "",
   "license": "ISC",
@@ -23,7 +25,8 @@
     "package": "^1.0.1",
     "sharp": "^0.24.1",
     "usb": "^1.6.3",
-    "yaml": "^1.9.2"
+    "yaml": "^1.9.2",
+    "snyk": "^1.320.4"
   },
   "devDependencies": {
     "@types/bunyan": "^1.8.6",
@@ -38,5 +41,6 @@
   },
   "bin": {
     "streamdeck-mqtt": ". .build/src/cli.js"
-  }
+  },
+  "snyk": true
 }
