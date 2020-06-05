@@ -26,7 +26,7 @@
     "sharp": "^0.24.1",
     "usb": "^1.6.3",
     "yaml": "^1.9.2",
-    "snyk": "^1.320.4"
+    "snyk": "^1.321.0"
   },
   "devDependencies": {
     "@types/bunyan": "^1.8.6",
